@@ -1,0 +1,29 @@
+-- Which item was purchased first by the customer after they became a member?
+
+select customer_id, order_date,join_date,product_name,drnk from
+(select m.product_id, s.order_date, s.customer_id,mem.join_date,m.product_name,
+dense_rank() over(partition by s.customer_id order by s.order_date) drnk
+from sales s join members mem
+on s.customer_id = mem.customer_id
+join menu m
+on s.product_id = m.product_id
+where order_date >= join_date ) tmp where tmp.drnk = 1 ;
+
+
+
+
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.IntegerType
+import org.apache.spark.sql.expressions.Window
+
+val sales = Seq(("A", "2021-01-01", "1"),("A", "2021-01-01", "2"),("A","2021-01-07", "2"),("A", "2021-01-10", "3"),("A", "2021-01-11", "3"),("A","2021-01-11", "3"),("B", "2021-01-01", "2"),("B", "2021-01-02", "2"),("B","2021-01-04", "1"),("B", "2021-01-11", "1"),("B", "2021-01-16", "3"),("B","2021-02-01", "3"),("C", "2021-01-01", "3"),("C", "2021-01-01", "3"),("C","2021-01-07", "3")).toDF("customer_id","order_date","product_id")
+val menu = Seq( ("1", "sushi", "10"),("2", "curry", "15"), ("3", "ramen","12")).toDF("product_id","product_name","price").withColumn("price",col("price").cast(IntegerType)).withColumnRenamed("product_id", "product_id_menu")
+val members = Seq(("A", "2021-01-07"), ("B","2021-01-09")).toDF("customer_id","join_date").withColumnRenamed("customer_id","customer_id_mem")
+
+
+sales.join(members,sales("customer_id") === members("customer_id_mem"))
+.filter(col("order_date") > col("join_date"))
+.withColumn("dense_rank",dense_rank.over(Window.partitionBy("customer_id").orderBy("order_date")))
+.filter(col("dense_rank") === 1)
+.join(menu,sales("product_id") === menu("product_id_menu"))
+.select("customer_id_mem","product_name").show(false)
