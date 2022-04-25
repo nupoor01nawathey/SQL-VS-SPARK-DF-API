@@ -1,0 +1,23 @@
+-- What was the first item from the menu purchased by each customer?
+select order_date, customer_id, product_name from (
+  select s.order_date, s.customer_id, m.product_name,
+  DENSE_RANK() over (partition by s.customer_id order by s.order_date) as drnk
+  from sales s join menu m
+on s.product_id=m.product_id) tmp where tmp.drnk = 1 ;
+
+
+
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.IntegerType
+import org.apache.spark.sql.expressions.Window
+
+val sales = Seq(("A", "2021-01-01", "1"),("A","2021-01-01", "2"),("A", "2021-01-07", "2"),("A","2021-01-10", "3"),("A", "2021-01-11", "3"),("A","2021-01-11", "3"),("B", "2021-01-01", "2"),("B","2021-01-02", "2"),("B", "2021-01-04", "1"),("B","2021-01-11", "1"),("B", "2021-01-16", "3"),("B","2021-02-01", "3"),("C", "2021-01-01", "3"),("C","2021-01-01", "3"),("C", "2021-01-07","3")).toDF("customer_id","order_date","product_id")
+
+val menu = Seq( ("1", "sushi", "10"),("2", "curry", "15"),("3", "ramen","12")).toDF("product_id","product_name","price").withColumn("price",col("price").cast(IntegerType))
+
+val windowSpec =Window.partitionBy("customer_id").orderBy("order_date")
+
+sales.join(menu, sales("product_id") === menu("product_id"))
+.withColumn("dense_rank",dense_rank.over(windowSpec)).filter(col("dense_rank") === 1)
+.select("order_date","customer_id","product_name").
+show(false)
